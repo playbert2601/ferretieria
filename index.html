@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ferretería Pro - Catálogo e Inventario</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800 flex flex-col min-h-screen">
+
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <nav class="bg-amber-600 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- ACCESO SECRETO: Doble clic aquí -->
+                <div class="flex items-center cursor-pointer select-none" onclick="switchView('catalog')" ondblclick="openLoginModal()">
+                    <i class="fas fa-hammer text-2xl mr-3"></i>
+                    <span class="font-bold text-xl tracking-tight">Ferretería Pro</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="switchView('catalog')" class="hover:bg-amber-700 px-3 py-2 rounded-md text-sm font-medium transition-colors hidden sm:block">Catálogo</button>
+                    <button id="nav-logout-btn" onclick="logoutAdmin()" class="hidden bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-sm">
+                        <i class="fas fa-sign-out-alt mr-2"></i>Salir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div id="loading-view" class="flex flex-col items-center justify-center py-20 fade-in">
+            <i class="fas fa-circle-notch fa-spin text-4xl text-amber-500 mb-4"></i>
+            <p class="text-slate-500">Conectando a base de datos...</p>
+        </div>
+
+        <!-- Catalog View -->
+        <div id="catalog-view" class="hidden fade-in">
+            <div class="mb-8 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-800 mb-2">Nuestro Catálogo</h1>
+                    <p class="text-slate-500">Herramientas y materiales de calidad para tus proyectos.</p>
+                </div>
+                <div class="mt-4 sm:mt-0 relative">
+                    <input type="text" id="search-input" placeholder="Buscar productos..." class="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none w-full sm:w-64" onkeyup="filterCatalog()">
+                    <i class="fas fa-search absolute left-3 top-3 text-slate-400"></i>
+                </div>
+            </div>
+
+            <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+            
+            <div id="empty-catalog-msg" class="hidden text-center py-20 bg-white rounded-xl shadow-sm border border-slate-100">
+                <i class="fas fa-box-open text-6xl text-slate-300 mb-4"></i>
+                <h3 class="text-xl font-medium text-slate-600">No hay productos disponibles</h3>
+                <p class="text-slate-400 mt-2">El inventario está vacío en este momento.</p>
+            </div>
+        </div>
+
+        <!-- Admin View -->
+        <div id="admin-view" class="hidden fade-in">
+            <div class="mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-800">Panel de Inventario</h1>
+                    <p class="text-slate-500">Gestiona los productos de la ferretería.</p>
+                </div>
+                <button onclick="openProductModal()" class="bg-amber-600 hover:bg-amber-700 text-white px-5 py-2.5 rounded-lg shadow-md font-medium transition-colors flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Nuevo Producto
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-600 text-sm uppercase tracking-wider border-b border-slate-200">
+                                <th class="p-4 font-semibold">Producto</th>
+                                <th class="p-4 font-semibold">Categoría</th>
+                                <th class="p-4 font-semibold text-right">Precio</th>
+                                <th class="p-4 font-semibold text-center">Stock</th>
+                                <th class="p-4 font-semibold text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <div id="empty-admin-msg" class="hidden text-center py-12">
+                    <p class="text-slate-500">No tienes productos en el inventario.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <div id="login-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden fade-in">
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <div class="bg-amber-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-amber-600 text-2xl"><i class="fas fa-user-lock"></i></div>
+                    <h3 class="text-2xl font-bold text-slate-800">Modo Dueño</h3>
+                </div>
+                <div class="mb-4">
+                    <input type="password" id="password-input" placeholder="Contraseña..." class="w-full px-4 py-3 rounded-lg border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition-all text-lg text-center">
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="closeModals()" class="flex-1 px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium transition-colors">Cancelar</button>
+                    <button onclick="verifyLogin()" class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition-colors shadow-md">Ingresar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="product-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden fade-in my-8">
+            <div class="p-6">
+                <h3 id="modal-title" class="text-2xl font-bold text-slate-800 mb-6">Añadir Producto</h3>
+                <form id="product-form" onsubmit="handleProductSubmit(event)">
+                    <input type="hidden" id="prod-id">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Nombre del Producto *</label>
+                            <input type="text" id="prod-name" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none">
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
+                                <select id="prod-category" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none bg-white">
+                                    <option value="Herramientas Manuales">Herramientas Manuales</option>
+                                    <option value="Herramientas Eléctricas">Herramientas Eléctricas</option>
+                                    <option value="Materiales">Materiales</option>
+                                    <option value="Plomería">Plomería</option>
+                                    <option value="Electricidad">Electricidad</option>
+                                    <option value="Pinturas">Pinturas</option>
+                                    <option value="Otros">Otros</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1">Stock *</label>
+                                <input type="number" id="prod-stock" min="0" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Precio (S/ o $) *</label>
+                            <div class="relative">
+                                <span class="absolute left-3 top-2 text-slate-500">$</span>
+                                <input type="number" id="prod-price" step="0.01" min="0" required class="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500 outline-none">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Imagen del Producto</label>
+                            <div class="flex flex-col gap-2">
+                                <input type="file" id="prod-image-file" accept="image/*" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 transition-colors">
+                            </div>
+                            <input type="hidden" id="prod-image-base64">
+                            <input type="hidden" id="prod-image" value="">
+                            <div id="image-preview-container" class="hidden mt-3 text-center">
+                                <span class="text-xs text-slate-500 block mb-1">Vista previa:</span>
+                                <img id="image-preview" src="" alt="Vista previa" class="h-24 w-auto mx-auto rounded border border-slate-200 object-cover shadow-sm">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" onclick="closeModals()" class="px-5 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium transition-colors">Cancelar</button>
+                        <button type="submit" class="px-5 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium transition-colors shadow-md">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="hidden fixed inset-0 bg-slate-900 bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden fade-in">
+            <div class="p-6 text-center">
+                <div class="text-red-500 text-5xl mb-4"><i class="fas fa-exclamation-circle"></i></div>
+                <h3 class="text-xl font-bold text-slate-800 mb-2">¿Eliminar producto?</h3>
+                <div class="flex gap-3 mt-6">
+                    <button onclick="closeModals()" class="flex-1 px-4 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium transition-colors">Cancelar</button>
+                    <button id="confirm-delete-btn" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors shadow-md">Eliminar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs & Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // =====================================================================
+        // ⚠️ REEMPLAZA TODO ESTE BLOQUE CON TU CONFIGURACIÓN DE FIREBASE ⚠️
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY",
+            authDomain: "ferreteria-sistemas.firebaseapp.com", // Ejemplo
+            projectId: "ferreteria-sistemas",
+            storageBucket: "ferreteria-sistemas.appspot.com",
+            messagingSenderId: "TU_MESSAGING_SENDER_ID",
+            appId: "TU_APP_ID"
+        };
+        // =====================================================================
+
+        window.isAdmin = false;
+        window.products = [];
+        window.currentView = 'catalog';
+        let db, auth, user;
+        let productToDelete = null;
+        let hasSeeded = false;
+
+        async function initApp() {
+            try {
+                if (firebaseConfig.apiKey === "TU_API_KEY") {
+                    showToast("Atención: Necesitas poner tus datos de Firebase en el código HTML.", "error");
+                    return;
+                }
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Iniciar sesión anónima (Requiere activarlo en Firebase Console > Authentication)
+                await signInAnonymously(auth);
+                user = auth.currentUser;
+
+                listenToInventory();
+
+            } catch (error) {
+                console.error("Firebase error:", error);
+                showToast("Error al conectar con la base de datos. ¿Activaste Autenticación Anónima?", "error");
+            }
+        }
+
+        function listenToInventory() {
+            // AHORA USA LA COLECCIÓN 'productos' DIRECTAMENTE EN TU PROPIO PROYECTO
+            const inventoryRef = collection(db, 'productos');
+
+            onSnapshot(inventoryRef, (snapshot) => {
+                if (snapshot.empty && !hasSeeded && user) {
+                    hasSeeded = true;
+                    seedInitialData();
+                }
+
+                window.products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                window.products.sort((a, b) => a.name.localeCompare(b.name));
+
+                document.getElementById('loading-view').classList.add('hidden');
+                
+                if (window.currentView === 'catalog') {
+                    renderCatalog();
+                    document.getElementById('catalog-view').classList.remove('hidden');
+                } else if (window.currentView === 'admin') {
+                    renderAdminTable();
+                }
+            }, (error) => {
+                showToast("Error al leer datos. Verifica las reglas de Firestore.", "error");
+                console.error(error);
+            });
+        }
+
+        window.renderCatalog = function(productsToRender = window.products) {
+            const grid = document.getElementById('products-grid');
+            const emptyMsg = document.getElementById('empty-catalog-msg');
+            grid.innerHTML = '';
+            
+            if (productsToRender.length === 0) {
+                grid.classList.add('hidden');
+                emptyMsg.classList.remove('hidden');
+                return;
+            }
+            
+            grid.classList.remove('hidden');
+            emptyMsg.classList.add('hidden');
+
+            productsToRender.forEach(p => {
+                const stockStatus = p.stock > 10 ? `<span class="bg-green-100 text-green-800 text-xs px-2.5 py-0.5 rounded-full">En stock (${p.stock})</span>`
+                    : p.stock > 0 ? `<span class="bg-amber-100 text-amber-800 text-xs px-2.5 py-0.5 rounded-full">Pocas unids (${p.stock})</span>`
+                    : `<span class="bg-red-100 text-red-800 text-xs px-2.5 py-0.5 rounded-full">Agotado</span>`;
+                const imageUrl = p.image || `https://placehold.co/400x300/f1f5f9/64748b?text=${encodeURIComponent(p.category)}`;
+
+                grid.innerHTML += `
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                        <div class="h-48 relative">
+                            <img src="${imageUrl}" class="w-full h-full object-cover">
+                            <div class="absolute top-2 right-2">${stockStatus}</div>
+                        </div>
+                        <div class="p-4 flex-grow flex flex-col justify-between">
+                            <div><p class="text-xs text-slate-400 uppercase font-semibold mb-1">${p.category}</p>
+                            <h3 class="text-lg font-bold text-slate-800 mb-2">${p.name}</h3></div>
+                            <div class="mt-4 flex justify-between items-center">
+                                <span class="text-2xl font-bold text-amber-600">$${parseFloat(p.price).toFixed(2)}</span>
+                                <button onclick="buyViaWhatsApp('${p.name}', ${p.price})" class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-2"><i class="fab fa-whatsapp"></i> Pedir</button>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+        };
+
+        window.renderAdminTable = function() {
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+            
+            if (window.products.length === 0) {
+                document.getElementById('empty-admin-msg').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('empty-admin-msg').classList.add('hidden');
+
+            window.products.forEach(p => {
+                const imageUrl = p.image || `https://placehold.co/40x40/f1f5f9/64748b?text=Img`;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-4 border-t flex items-center"><img src="${imageUrl}" class="w-10 h-10 rounded mr-3 object-cover"><span class="font-medium">${p.name}</span></td>
+                        <td class="p-4 border-t">${p.category}</td>
+                        <td class="p-4 border-t text-right font-medium">$${parseFloat(p.price).toFixed(2)}</td>
+                        <td class="p-4 border-t text-center">${p.stock}</td>
+                        <td class="p-4 border-t text-center">
+                            <button onclick="editProduct('${p.id}')" class="text-blue-500 mx-1"><i class="fas fa-edit"></i></button>
+                            <button onclick="confirmDelete('${p.id}')" class="text-red-500 mx-1"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>`;
+            });
+        };
+
+        window.buyViaWhatsApp = (name, price) => {
+            const url = `https://wa.me/51971595449?text=${encodeURIComponent(`Hola, me interesa: *${name}* a $${parseFloat(price).toFixed(2)}.`)}`;
+            window.open(url, '_blank');
+        };
+
+        window.filterCatalog = () => {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            renderCatalog(window.products.filter(p => p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query)));
+        };
+
+        window.switchView = (view) => {
+            if (view === 'admin' && !window.isAdmin) return openLoginModal();
+            window.currentView = view;
+            document.getElementById('catalog-view').classList.toggle('hidden', view !== 'catalog');
+            document.getElementById('admin-view').classList.toggle('hidden', view !== 'admin');
+            if (view === 'catalog') renderCatalog(); else renderAdminTable();
+        };
+
+        window.openLoginModal = () => { if (window.isAdmin) switchView('admin'); else { document.getElementById('login-modal').classList.remove('hidden'); document.getElementById('password-input').focus(); } };
+        window.verifyLogin = () => {
+            if (document.getElementById('password-input').value === 'ferreteria') {
+                window.isAdmin = true; closeModals(); document.getElementById('nav-logout-btn').classList.remove('hidden'); switchView('admin');
+            } else showToast("Contraseña incorrecta", "error");
+        };
+        window.logoutAdmin = () => { window.isAdmin = false; document.getElementById('nav-logout-btn').classList.add('hidden'); switchView('catalog'); };
+        document.getElementById('password-input').addEventListener('keypress', e => { if(e.key === 'Enter') verifyLogin(); });
+
+        document.getElementById('prod-image-file').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = event => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    if (w > h) { if (w > 400) { h *= 400/w; w = 400; } } else { if (h > 400) { w *= 400/h; h = 400; } }
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    document.getElementById('prod-image-base64').value = dataUrl;
+                    document.getElementById('image-preview').src = dataUrl;
+                    document.getElementById('image-preview-container').classList.remove('hidden');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        window.handleProductSubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('prod-id').value;
+            const docId = id || crypto.randomUUID();
+            const data = {
+                name: document.getElementById('prod-name').value, category: document.getElementById('prod-category').value,
+                stock: parseInt(document.getElementById('prod-stock').value), price: parseFloat(document.getElementById('prod-price').value),
+                image: document.getElementById('prod-image-base64').value
+            };
+            try {
+                // Guarda en la colección 'productos'
+                await setDoc(doc(db, 'productos', docId), data);
+                showToast("Producto guardado", "success"); closeModals();
+            } catch (err) { showToast("Error al guardar", "error"); }
+        };
+
+        window.editProduct = (id) => {
+            const p = window.products.find(x => x.id === id);
+            document.getElementById('modal-title').innerText = "Editar"; document.getElementById('prod-id').value = p.id;
+            document.getElementById('prod-name').value = p.name; document.getElementById('prod-category').value = p.category;
+            document.getElementById('prod-stock').value = p.stock; document.getElementById('prod-price').value = p.price;
+            if(p.image){ document.getElementById('prod-image-base64').value = p.image; document.getElementById('image-preview').src = p.image; document.getElementById('image-preview-container').classList.remove('hidden'); }
+            document.getElementById('product-modal').classList.remove('hidden');
+        };
+
+        window.confirmDelete = (id) => { productToDelete = id; document.getElementById('delete-modal').classList.remove('hidden'); };
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+            if (!productToDelete) return;
+            try { await deleteDoc(doc(db, 'productos', productToDelete)); showToast("Eliminado", "info"); closeModals(); } catch(e) { showToast("Error", "error"); }
+        });
+
+        async function seedInitialData() {
+            const dummy = [{name: "Martillo Base", category: "Herramientas Manuales", stock: 10, price: 15.00, image: ""}];
+            for (const p of dummy) await setDoc(doc(collection(db, 'productos')), p);
+        }
+
+        window.openProductModal = () => { document.getElementById('product-form').reset(); document.getElementById('prod-id').value = ''; document.getElementById('image-preview-container').classList.add('hidden'); document.getElementById('product-modal').classList.remove('hidden'); };
+        window.closeModals = () => { ['login-modal', 'product-modal', 'delete-modal'].forEach(id => document.getElementById(id).classList.add('hidden')); productToDelete = null; };
+        window.showToast = (msg, type='info') => {
+            const toast = document.createElement('div');
+            toast.className = `text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 fade-in ${type==='success'?'bg-green-600':type==='error'?'bg-red-600':'bg-slate-800'}`;
+            toast.innerHTML = `<span>${msg}</span>`;
+            document.getElementById('toast-container').appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 3000);
+        };
+
+        window.onload = initApp;
+    </script>
+</body>
+</html>
